@@ -34,7 +34,7 @@ var server = http.createServer((req, res) => {
     // Get the payload, if any
     var decoder = new strDecoder('utf-8');
     var buffer = '';
-    
+
     // Handle incoming stream 
     req.on('data', (data) => {
         buffer += decoder.write(data);
@@ -44,21 +44,39 @@ var server = http.createServer((req, res) => {
     req.on('end',() => {
         buffer += decoder.end();
 
-        // Send response 
-        res.end('lx-res');
+        // Choose handler else use notfound handler
+        var chosenHandler = typeof(router[trimmed]) !== 'undefined' ? router[trimmed] : handlers.notfound;
 
-        // Log path requested
-        log = {
-            request: trimmed,
-            query: queryString,
-            payload: buffer, 
+        // Construct the data object to send to the handler
+        var data = {
+            trimmed, 
+            queryString,
             method,
             headers,
+            payload:buffer
         };
-        console.log(log);
+
+        // Route the request to the handler specified in the router 
+        chosenHandler(data, (status, payload) => {
+
+            // use the status code callback by the handler or default to 200 
+            status = typeof(status) == 'number' ? status : 200;
+
+            // use the payload callback or default an empty object
+            payload = typeof(payload) == 'object' ? payload : {};
+
+            // Convert payload to a string 
+            var payloadString = JSON.stringify(payload); // payload sending back to the user 
+
+            // return the response 
+            res.writeHead(status);
+            res.end(payloadString);
+
+            console.log('Status code: ' + status + '\nPayload: ' + payloadString);
+
+        });
+
     });
-
-
 
 });
 
@@ -66,6 +84,36 @@ var server = http.createServer((req, res) => {
 server.listen(port, () => {
     console.log('Server running on port '+ port + ' ...');
 });
+
+// ---- Router logic ---- //
+// Define handlers 
+var handlers = {};
+
+// Root handler
+handlers.root = (data, callback) => {
+    // callback an http status code and a payload object 
+    callback(200, {'name':'home handler'});
+};
+
+// Not found handler 
+handlers.notfound = (data, callback) => {
+    callback(404);
+};
+
+// Define a router 
+var router = {
+    'home' : handlers.root
+};
+
+
+
+
+
+
+
+
+
+
 
 
 
